@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <mpi.h>
+#include <math.h>
+
+
+#define SIZE 10
+
+
+float evaluate_hyperparam(float param) {
+    return 95.0 + 5.0 * expf(-param); // More realistic score
+}
+
+
+int main(int argc, char** argv) {
+    float hyperparams[3][SIZE] = {
+        {0.0001, 0.0005, 0.001, 0.005, 0.01, 0.02, 0.03, 0.05, 0.07, 0.1},
+        {8, 16, 24, 32, 48, 64, 80, 96, 112, 128},
+        {0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0}
+    };
+
+
+    float local_data[SIZE], local_scores[SIZE] = {0}, final_scores[SIZE] = {0};
+    int rank, size, chunk = SIZE;
+
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+
+    chunk = SIZE / size;
+
+
+    for (int d = 0; d < 3; d++) {
+        double start = MPI_Wtime();
+
+
+        MPI_Scatter(hyperparams[d], chunk, MPI_FLOAT, local_data, chunk, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+
+        for (int i = 0; i < chunk; i++) {
+            local_scores[i] = evaluate_hyperparam(local_data[i]);
+        }
+
+
+        MPI_Gather(local_scores, chunk, MPI_FLOAT, final_scores, chunk, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+
+        double end = MPI_Wtime();
+
+
+        if (rank == 0) {
+            printf("Dataset %d (MPI) Evaluation Time: %f s\n", d + 1, end - start);
+            printf("Scores: ");
+            for (int i = 0; i < SIZE; i++) {
+                printf("%.2f ", final_scores[i]);
+            }
+            printf("\n\n");
+        }
+    }
+
+
+    MPI_Finalize();
+    return 0;
+}
