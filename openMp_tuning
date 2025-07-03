@@ -1,0 +1,60 @@
+#include <stdio.h>
+#include <omp.h>
+#include <math.h>
+
+#define SIZE 10
+
+// Function to evaluate hyperparameters based on dataset type
+float evaluate_score(float value, int dataset_index) {
+    switch (dataset_index) {
+        case 0: // Learning rate (small decimal values)
+            return 95.0 + 5.0 * expf(-value);  // Simulates diminishing returns
+        case 1: // Batch size (larger integers)
+            return 100.0 - (value / 10.0);     // Normalized to avoid negative score
+        case 2: // Dropout rate (1–10 range)
+            return 100.0 - (value * 3);        // Penalize higher dropout slightly
+        default:
+            return 0.0;
+    }
+}
+
+int main() {
+    float hyperparams[3][SIZE] = {
+        {0.001, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5},          // Learning rate
+        {32, 64, 128, 256, 16, 8, 4, 2, 1, 512},                          // Batch size
+        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}                                   // Dropout rate
+    };
+
+    for (int d = 0; d < 3; d++) {
+        float scores[SIZE] = {0};
+        double start = omp_get_wtime();
+
+        // Display number of threads used
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                printf("Dataset %d: Using %d OpenMP thread(s)\n", d + 1, omp_get_num_threads());
+            }
+        }
+
+        // Parallel evaluation
+        #pragma omp parallel for
+        for (int i = 0; i < SIZE; i++) {
+            scores[i] = evaluate_score(hyperparams[d][i], d);
+        }
+
+        double end = omp_get_wtime();
+
+        // Display output
+        printf("Dataset %d (OpenMP) Evaluation Time:\n", d + 1);
+        printf("%.6f s\n", end - start);
+        printf("Scores:\n");
+        for (int i = 0; i < SIZE; i++) {
+            printf("%.2f ", scores[i]);
+        }
+        printf("\n\n");
+    }
+
+    return 0;
+}
